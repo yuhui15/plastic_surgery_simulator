@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FaceForm · 面部形态模拟器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./">
+          <span class="brand-mark">F</span>
+          <span>FaceForm</span>
+        </a>
+        <span class="privacy-note"><span class="status-dot"></span>图片仅在本地处理</span>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">面部形态模拟器</p>
+        <h1>轻轻一点，<em>探索</em>面部变化</h1>
+        <p class="hero-copy">上传一张正脸或侧脸照片，选择面部特征点并拖动它，直观预览局部形态变化。</p>
+      </section>
+
+      <section class="workspace" aria-label="面部模拟工作区">
+        <div class="canvas-card">
+          <div class="canvas-toolbar">
+            <div>
+              <span class="toolbar-title">预览画布</span>
+              <span id="canvasHint" class="toolbar-hint">上传图片后开始</span>
+            </div>
+            <button id="clearPointButton" class="text-button" type="button" disabled>清除选点</button>
+          </div>
+          <div id="canvasStage" class="canvas-stage">
+            <canvas id="faceCanvas" aria-label="面部照片编辑画布"></canvas>
+            <div id="emptyState" class="empty-state">
+              <div class="upload-icon">↑</div>
+              <strong>把照片放在这里</strong>
+              <span>支持 JPG、PNG、WEBP，建议使用清晰的人脸照片</span>
+              <label class="primary-button upload-label" for="imageInput">选择图片</label>
+            </div>
+            <div id="dropOverlay" class="drop-overlay">松开即可上传</div>
+          </div>
+          <div class="canvas-footer">
+            <span id="pointStatus"><span class="status-dot muted"></span>尚未选择面部特征点</span>
+            <span id="imageDimensions"></span>
+          </div>
+        </div>
+
+        <aside class="control-panel">
+          <div class="panel-section intro-section">
+            <span class="step-number">01</span>
+            <div>
+              <h2>上传你的照片</h2>
+              <p>建议使用光线均匀、无遮挡的正脸或侧脸照片。</p>
+            </div>
+            <label class="secondary-button" for="imageInput">重新选择</label>
+            <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          </div>
+
+          <div class="panel-section">
+            <span class="step-number">02</span>
+            <div>
+              <h2>标记面部区域</h2>
+              <p id="pointInstruction">依次点击：发际线、下巴端点、左颧骨、右颧骨。</p>
+            </div>
+            <div class="feature-grid" role="group" aria-label="常用面部特征点">
+              <button class="feature-chip" data-feature="发际线" type="button">发际线</button>
+              <button class="feature-chip" data-feature="下巴端点" type="button">下巴端点</button>
+              <button class="feature-chip" data-feature="左颧骨" type="button">左颧骨</button>
+              <button class="feature-chip" data-feature="右颧骨" type="button">右颧骨</button>
+            </div>
+          </div>
+
+          <div class="panel-section ratio-section">
+            <div class="section-heading">
+              <div>
+                <span class="step-number">03</span>
+                <h2>调整面部长宽比</h2>
+              </div>
+              <output id="ratioOutput">--</output>
+            </div>
+            <p>长宽比 = 面部高度 ÷ 面部宽度；纵向基准保持不变，不叠加变形结果。</p>
+            <label class="ratio-label" for="ratioControl">长宽比 <output id="ratioValue">--</output></label>
+            <input id="ratioControl" type="range" min="0.1" max="3" value="1" step="0.01" disabled />
+          </div>
+
+          <div class="panel-actions">
+            <button id="undoButton" class="secondary-button action-button" type="button" disabled>撤销</button>
+            <button id="resetButton" class="secondary-button action-button" type="button" disabled>重置</button>
+            <button id="exportButton" class="primary-button action-button export-button" type="button" disabled>导出预览 <span>↓</span></button>
+          </div>
+          <p class="disclaimer">本工具仅用于视觉模拟和设计沟通，不构成医疗建议或手术结果预测。</p>
+        </aside>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
