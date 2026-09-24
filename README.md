@@ -26,7 +26,7 @@ FaceForm 是一个基于浏览器运行的面部形态模拟工具。用户上�
 ### Windows PowerShell
 
 ```powershell
-cd path\to\plastic_surgery_simulator
+cd C:\Users\sunyu\Desktop\plastic_surgery_simulator
 python -m http.server 4173
 ```
 
