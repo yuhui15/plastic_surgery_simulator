@@ -62,13 +62,15 @@
             <span class="step-number">02</span>
             <div>
               <h2>标记面部区域</h2>
-              <p id="pointInstruction">依次点击：发际线、下巴端点、左颧骨、右颧骨。</p>
+              <p id="pointInstruction">依次点击：发际线、下巴端点、左颧骨、右颧骨、左瞳仁、右瞳仁。</p>
             </div>
             <div class="feature-grid" role="group" aria-label="常用面部特征点">
               <button class="feature-chip" data-feature="发际线" type="button">发际线</button>
               <button class="feature-chip" data-feature="下巴端点" type="button">下巴端点</button>
               <button class="feature-chip" data-feature="左颧骨" type="button">左颧骨</button>
               <button class="feature-chip" data-feature="右颧骨" type="button">右颧骨</button>
+              <button class="feature-chip" data-feature="左瞳仁" type="button">左瞳仁</button>
+              <button class="feature-chip" data-feature="右瞳仁" type="button">右瞳仁</button>
             </div>
           </div>
 
@@ -83,6 +85,19 @@
             <p>长宽比 = 面部高度 ÷ 面部宽度；纵向基准保持不变，不叠加变形结果。</p>
             <label class="ratio-label" for="ratioControl">长宽比 <output id="ratioValue">--</output></label>
             <input id="ratioControl" type="range" min="0.1" max="3" value="1" step="0.01" disabled />
+          </div>
+
+          <div class="panel-section ratio-section">
+            <div class="section-heading">
+              <div>
+                <span class="step-number">04</span>
+                <h2>调整瞳距面宽比</h2>
+              </div>
+              <output id="pupilRatioOutput">--</output>
+            </div>
+            <p>瞳距面宽比 = 左右瞳仁中心距离 ÷ 面部宽度；调整时面部四点保持不动。</p>
+            <label class="ratio-label" for="pupilRatioControl">瞳距面宽比 <output id="pupilRatioValue">--</output></label>
+            <input id="pupilRatioControl" type="range" min="0.1" max="1" value="0.5" step="0.01" disabled />
           </div>
 
           <div class="panel-actions">

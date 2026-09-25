@@ -9,6 +9,9 @@ const imageDimensions = document.querySelector("#imageDimensions");
 const ratioControl = document.querySelector("#ratioControl");
 const ratioValue = document.querySelector("#ratioValue");
 const ratioOutput = document.querySelector("#ratioOutput");
+const pupilRatioControl = document.querySelector("#pupilRatioControl");
+const pupilRatioValue = document.querySelector("#pupilRatioValue");
+const pupilRatioOutput = document.querySelector("#pupilRatioOutput");
 const pointInstruction = document.querySelector("#pointInstruction");
 const undoButton = document.querySelector("#undoButton");
 const resetButton = document.querySelector("#resetButton");
@@ -21,7 +24,8 @@ let history = [];
 let points = [];
 let originalPoints = [];
 let ratioSnapshotAdded = false;
-const pointNames = ["发际线", "下巴端点", "左颧骨", "右颧骨"];
+let pupilRatioSnapshotAdded = false;
+const pointNames = ["发际线", "下巴端点", "左颧骨", "右颧骨", "左瞳仁", "右瞳仁"];
 
 const cloneImageData = (data) => (
   new ImageData(new Uint8ClampedArray(data.data), data.width, data.height)
@@ -33,7 +37,8 @@ const updateButtons = () => {
   resetButton.disabled = !ready;
   exportButton.disabled = !ready;
   clearPointButton.disabled = !ready || points.length === 0;
-  ratioControl.disabled = points.length !== 4;
+  ratioControl.disabled = points.length !== 6;
+  pupilRatioControl.disabled = points.length !== 6;
 };
 
 const render = () => {
@@ -47,12 +52,12 @@ const render = () => {
   points.forEach((item, index) => {
     ctx.fillStyle = "#287865";
     ctx.beginPath();
-    ctx.arc(item.x, item.y, 7 * scale, 0, Math.PI * 2);
+    ctx.arc(item.x, item.y, 4.5 * scale, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#fff";
     ctx.stroke();
     ctx.fillStyle = "#fff";
-    ctx.font = `700 ${10 * scale}px sans-serif`;
+    ctx.font = `700 ${7 * scale}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(pointNames[index], item.x, item.y);
@@ -84,13 +89,15 @@ const sampleBilinear = (source, x, y, channel) => {
       - (topLeft + (topRight - topLeft) * xWeight)) * yWeight;
 };
 
-const applyFaceRatio = () => {
-  if (!originalImageData || originalPoints.length !== 4) return;
+const applyTransforms = () => {
+  if (!originalImageData || originalPoints.length !== 6) return;
   const source = originalImageData;
-  const left = Math.max(0, Math.floor(Math.min(...originalPoints.map((item) => item.x))));
-  const right = Math.min(source.width - 1, Math.ceil(Math.max(...originalPoints.map((item) => item.x))));
-  const top = Math.max(0, Math.floor(Math.min(...originalPoints.map((item) => item.y))));
-  const bottom = Math.min(source.height - 1, Math.ceil(Math.max(...originalPoints.map((item) => item.y))));
+  const facePoints = originalPoints.slice(0, 4);
+  const pupilPoints = originalPoints.slice(4, 6);
+  const left = Math.max(0, Math.floor(Math.min(...facePoints.map((item) => item.x))));
+  const right = Math.min(source.width - 1, Math.ceil(Math.max(...facePoints.map((item) => item.x))));
+  const top = Math.max(0, Math.floor(Math.min(...facePoints.map((item) => item.y))));
+  const bottom = Math.min(source.height - 1, Math.ceil(Math.max(...facePoints.map((item) => item.y))));
   const centerX = (left + right) / 2;
   const centerY = (top + bottom) / 2;
   const originalRatio = (bottom - top) / Math.max(1, right - left);
@@ -124,25 +131,61 @@ const applyFaceRatio = () => {
       }
     }
   }
+  const originalPupilDistance = Math.abs(pupilPoints[1].x - pupilPoints[0].x);
+  const originalFaceWidth = Math.max(1, right - left);
+  const pupilRatio = Number(pupilRatioControl.value);
+  const pupilScale = (pupilRatio * originalFaceWidth) / Math.max(1, originalPupilDistance);
+  const pupilCenter = (pupilPoints[0].x + pupilPoints[1].x) / 2;
+  const pupilFeather = Math.max(18, originalFaceWidth * 0.12);
+  const pupilInfluence = (x, y) => {
+    const distance = Math.min(
+      Math.hypot(x - pupilPoints[0].x, y - pupilPoints[0].y),
+      Math.hypot(x - pupilPoints[1].x, y - pupilPoints[1].y),
+    );
+    const value = Math.max(0, Math.min(1, 1 - distance / pupilFeather));
+    return value * value * (3 - 2 * value);
+  };
+  if (pupilPoints[0].x !== pupilPoints[1].x) {
+    for (let y = 0; y < source.height; y += 1) {
+      for (let x = 0; x < source.width; x += 1) {
+        const influence = pupilInfluence(x, y);
+        if (influence <= 0) continue;
+        const pupilX = pupilCenter + (x - pupilCenter) / pupilScale;
+        const sampleX = x + (pupilX - x) * influence;
+        const targetIndex = (y * source.width + x) * 4;
+        for (let channel = 0; channel < 4; channel += 1) {
+          result.data[targetIndex + channel] = sampleBilinear(result, sampleX, y, channel);
+        }
+      }
+    }
+  }
   currentImageData = result;
-  points = originalPoints.map((item) => ({
+  points = [
+    ...facePoints.map((item) => ({
     x: centerX + (item.x - centerX) * horizontalScale,
     y: item.y,
-  }));
+    })),
+    ...pupilPoints.map((item) => ({
+      x: pupilCenter + (item.x - pupilCenter) * pupilScale,
+      y: item.y,
+    })),
+  ];
   render();
   ratioValue.textContent = Number(ratioControl.value).toFixed(2);
   ratioOutput.textContent = Number(ratioControl.value).toFixed(2);
+  pupilRatioValue.textContent = Number(pupilRatioControl.value).toFixed(2);
+  pupilRatioOutput.textContent = Number(pupilRatioControl.value).toFixed(2);
 };
 
 const updatePointInstruction = () => {
-  if (points.length < 4) {
-    pointInstruction.textContent = `依次点击：发际线、下巴端点、左颧骨、右颧骨（${points.length}/4）。`;
+  if (points.length < 6) {
+    pointInstruction.textContent = `依次点击：${pointNames.join("、")}（${points.length}/6）。`;
     canvasHint.textContent = `请标记第 ${points.length + 1} 个点`;
     pointStatus.innerHTML = `<span class="status-dot${points.length ? "" : " muted"}"></span>已标记 ${points.length}/4 个点${points.length ? ` · 下一个：${pointNames[points.length]}` : ""}`;
   } else {
-    pointInstruction.textContent = "四点区域已确定，现在可以修改面部长宽比。";
+    pointInstruction.textContent = "六个点已确定，现在可以分别调整面部长宽比和瞳距面宽比。";
     canvasHint.textContent = "拖动下方滑杆改变面部比例";
-    pointStatus.innerHTML = '<span class="status-dot"></span>四点区域已锁定';
+    pointStatus.innerHTML = '<span class="status-dot"></span>六个点已锁定';
   }
   updateButtons();
 };
@@ -162,6 +205,7 @@ const loadImage = (file) => {
     points = [];
     originalPoints = [];
     ratioSnapshotAdded = false;
+    pupilRatioSnapshotAdded = false;
     emptyState.hidden = true;
     imageDimensions.textContent = `${nextImage.naturalWidth} × ${nextImage.naturalHeight}`;
     updatePointInstruction();
@@ -173,30 +217,47 @@ const loadImage = (file) => {
 
 imageInput.addEventListener("change", (event) => loadImage(event.target.files[0]));
 ratioControl.addEventListener("input", () => {
-  if (points.length !== 4) return;
+  if (points.length !== 6) return;
   if (!ratioSnapshotAdded) {
     history.push(cloneImageData(currentImageData));
     ratioSnapshotAdded = true;
   }
-  applyFaceRatio();
+  applyTransforms();
+  undoButton.disabled = false;
+});
+
+pupilRatioControl.addEventListener("input", () => {
+  if (points.length !== 6) return;
+  if (!pupilRatioSnapshotAdded) {
+    history.push(cloneImageData(currentImageData));
+    pupilRatioSnapshotAdded = true;
+  }
+  applyTransforms();
   undoButton.disabled = false;
 });
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (!currentImageData || points.length >= 4) return;
+  if (!currentImageData || points.length >= 6) return;
   points.push(canvasPosition(event));
-  if (points.length === 4) {
+  if (points.length === 6) {
     originalPoints = points.map((item) => ({ ...item }));
-    const left = Math.min(...originalPoints.map((item) => item.x));
-    const right = Math.max(...originalPoints.map((item) => item.x));
-    const top = Math.min(...originalPoints.map((item) => item.y));
-    const bottom = Math.max(...originalPoints.map((item) => item.y));
+    const facePoints = originalPoints.slice(0, 4);
+    const left = Math.min(...facePoints.map((item) => item.x));
+    const right = Math.max(...facePoints.map((item) => item.x));
+    const top = Math.min(...facePoints.map((item) => item.y));
+    const bottom = Math.max(...facePoints.map((item) => item.y));
     const originalRatio = (bottom - top) / Math.max(1, right - left);
     ratioControl.min = Math.max(0.1, originalRatio * 0.7).toFixed(2);
     ratioControl.max = Math.min(3, originalRatio * 1.35).toFixed(2);
     ratioControl.value = originalRatio.toFixed(2);
     ratioValue.textContent = originalRatio.toFixed(2);
     ratioOutput.textContent = originalRatio.toFixed(2);
+    const pupilRatio = Math.abs(originalPoints[5].x - originalPoints[4].x) / Math.max(1, right - left);
+    pupilRatioControl.min = Math.max(0.1, pupilRatio * 0.7).toFixed(2);
+    pupilRatioControl.max = Math.min(1, pupilRatio * 1.35).toFixed(2);
+    pupilRatioControl.value = pupilRatio.toFixed(2);
+    pupilRatioValue.textContent = pupilRatio.toFixed(2);
+    pupilRatioOutput.textContent = pupilRatio.toFixed(2);
   }
   document.querySelector(`.feature-chip[data-feature="${pointNames[points.length - 1]}"]`)?.classList.add("active");
   render();
@@ -214,17 +275,19 @@ undoButton.addEventListener("click", () => {
   const previous = history.pop();
   if (!previous) return;
   currentImageData = previous;
-  if (originalPoints.length === 4) {
-    const left = Math.min(...originalPoints.map((item) => item.x));
-    const right = Math.max(...originalPoints.map((item) => item.x));
-    const top = Math.min(...originalPoints.map((item) => item.y));
-    const bottom = Math.max(...originalPoints.map((item) => item.y));
+  if (originalPoints.length === 6) {
+    const facePoints = originalPoints.slice(0, 4);
+    const left = Math.min(...facePoints.map((item) => item.x));
+    const right = Math.max(...facePoints.map((item) => item.x));
+    const top = Math.min(...facePoints.map((item) => item.y));
+    const bottom = Math.max(...facePoints.map((item) => item.y));
     const originalRatio = (bottom - top) / Math.max(1, right - left);
     ratioControl.value = originalRatio.toFixed(2);
     ratioValue.textContent = originalRatio.toFixed(2);
     ratioOutput.textContent = originalRatio.toFixed(2);
     points = originalPoints.map((item) => ({ ...item }));
   }
+  pupilRatioSnapshotAdded = false;
   render();
   updateButtons();
 });
@@ -237,9 +300,13 @@ resetButton.addEventListener("click", () => {
   points = [];
   originalPoints = [];
   ratioSnapshotAdded = false;
+  pupilRatioSnapshotAdded = false;
   ratioControl.value = 1;
   ratioValue.textContent = "--";
   ratioOutput.textContent = "--";
+  pupilRatioControl.value = 0.5;
+  pupilRatioValue.textContent = "--";
+  pupilRatioOutput.textContent = "--";
   updatePointInstruction();
   render();
 });
@@ -249,9 +316,13 @@ clearPointButton.addEventListener("click", () => {
   originalPoints = [];
   currentImageData = cloneImageData(originalImageData);
   ratioSnapshotAdded = false;
+  pupilRatioSnapshotAdded = false;
   ratioControl.value = 1;
   ratioValue.textContent = "--";
   ratioOutput.textContent = "--";
+  pupilRatioControl.value = 0.5;
+  pupilRatioValue.textContent = "--";
+  pupilRatioOutput.textContent = "--";
   updatePointInstruction();
   render();
 });
