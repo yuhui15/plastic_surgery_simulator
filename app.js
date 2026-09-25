@@ -101,17 +101,34 @@ const applyTransforms = () => {
   const top = Math.max(0, Math.floor(Math.min(...facePoints.map((item) => item.y))));
   const bottom = Math.min(source.height - 1, Math.ceil(Math.max(...facePoints.map((item) => item.y))));
   const centerX = (left + right) / 2;
-  const centerY = (top + bottom) / 2;
   const originalRatio = (bottom - top) / Math.max(1, right - left);
   const ratioScale = Number(ratioControl.value) / originalRatio;
   const horizontalScale = 1 / ratioScale;
   const originalFaceWidth = Math.max(1, right - left);
+  const originalPupilDistance = Math.abs(pupilPoints[1].x - pupilPoints[0].x);
+  const targetPupilDistance = Number(pupilRatioControl.value) * originalFaceWidth;
+  const pupilCenter = (pupilPoints[0].x + pupilPoints[1].x) / 2;
+  const pupilTargets = [
+    { x: pupilCenter - targetPupilDistance / 2, y: pupilPoints[0].y },
+    { x: pupilCenter + targetPupilDistance / 2, y: pupilPoints[1].y },
+  ];
   const result = cloneImageData(source);
   const feather = Math.max(28, Math.min(source.width, source.height) * 0.16);
+  const pupilCoreRadius = Math.max(8, originalFaceWidth * 0.045);
+  const pupilGuardFeather = Math.max(10, originalFaceWidth * 0.05);
+  const pupilMoveCore = Math.max(4, originalFaceWidth * 0.025);
+  const pupilMoveFeather = Math.max(18, originalFaceWidth * 0.1);
   const smoothStep = (value) => {
     const clamped = Math.max(0, Math.min(1, value));
     return clamped * clamped * (3 - 2 * clamped);
   };
+  const distanceToPupils = (x, y) => Math.min(
+    Math.hypot(x - pupilPoints[0].x, y - pupilPoints[0].y),
+    Math.hypot(x - pupilPoints[1].x, y - pupilPoints[1].y),
+  );
+  const faceGuard = (x, y) => smoothStep(
+    (distanceToPupils(x, y) - pupilCoreRadius) / pupilGuardFeather,
+  );
   const outsideDistance = (x, y) => Math.max(
     left - x,
     x - right,
@@ -122,44 +139,32 @@ const applyTransforms = () => {
 
   for (let y = 0; y < source.height; y += 1) {
     for (let x = 0; x < source.width; x += 1) {
-      const pupilProtectionRadius = Math.max(10, originalFaceWidth * 0.035);
-      const inPupilProtectionZone = pupilPoints.some((item) => (
-        Math.hypot(x - item.x, y - item.y) <= pupilProtectionRadius
-      ));
-      if (inPupilProtectionZone) continue;
-      const influence = smoothStep(1 - outsideDistance(x, y) / feather);
-      if (influence <= 0) continue;
+      const faceInfluence = smoothStep(1 - outsideDistance(x, y) / feather);
+      if (faceInfluence <= 0) continue;
       const targetX = centerX + (x - centerX) / horizontalScale;
-      const targetY = y;
+      const proposedSourceX = x + (targetX - x) * faceInfluence;
+      const influence = faceInfluence * faceGuard(x, y) * faceGuard(proposedSourceX, y);
+      if (influence <= 0) continue;
       const sourceX = x + (targetX - x) * influence;
-      const sourceY = y + (targetY - y) * influence;
       const targetIndex = (y * source.width + x) * 4;
       for (let channel = 0; channel < 4; channel += 1) {
-        result.data[targetIndex + channel] = sampleBilinear(source, sourceX, sourceY, channel);
+        result.data[targetIndex + channel] = sampleBilinear(source, sourceX, y, channel);
       }
     }
   }
-  const originalPupilDistance = Math.abs(pupilPoints[1].x - pupilPoints[0].x);
-  const pupilRatio = Number(pupilRatioControl.value);
-  const pupilScale = (pupilRatio * originalFaceWidth) / Math.max(1, originalPupilDistance);
-  const pupilCenter = (pupilPoints[0].x + pupilPoints[1].x) / 2;
-  const pupilFeather = Math.max(18, originalFaceWidth * 0.12);
-  const pupilInfluence = (x, y) => {
-    const distance = Math.min(
-      Math.hypot(x - pupilPoints[0].x, y - pupilPoints[0].y),
-      Math.hypot(x - pupilPoints[1].x, y - pupilPoints[1].y),
-    );
-    const value = Math.max(0, Math.min(1, 1 - distance / pupilFeather));
-    return value * value * (3 - 2 * value);
-  };
-  if (pupilPoints[0].x !== pupilPoints[1].x) {
+
+  if (Math.abs(targetPupilDistance - originalPupilDistance) > 0.01) {
     const pupilSource = cloneImageData(result);
     for (let y = 0; y < source.height; y += 1) {
       for (let x = 0; x < source.width; x += 1) {
-        const influence = pupilInfluence(x, y);
+        const leftDistance = Math.hypot(x - pupilPoints[0].x, y - pupilPoints[0].y);
+        const rightDistance = Math.hypot(x - pupilPoints[1].x, y - pupilPoints[1].y);
+        const pupilIndex = leftDistance <= rightDistance ? 0 : 1;
+        const distance = Math.min(leftDistance, rightDistance);
+        const influence = 1 - smoothStep((distance - pupilMoveCore) / pupilMoveFeather);
         if (influence <= 0) continue;
-        const pupilX = pupilCenter + (x - pupilCenter) / pupilScale;
-        const sampleX = x + (pupilX - x) * influence;
+        const displacement = pupilTargets[pupilIndex].x - pupilPoints[pupilIndex].x;
+        const sampleX = x - displacement * influence;
         const targetIndex = (y * source.width + x) * 4;
         for (let channel = 0; channel < 4; channel += 1) {
           result.data[targetIndex + channel] = sampleBilinear(pupilSource, sampleX, y, channel);
@@ -170,13 +175,10 @@ const applyTransforms = () => {
   currentImageData = result;
   points = [
     ...facePoints.map((item) => ({
-    x: centerX + (item.x - centerX) * horizontalScale,
-    y: item.y,
-    })),
-    ...pupilPoints.map((item) => ({
-      x: pupilCenter + (item.x - pupilCenter) * pupilScale,
+      x: centerX + (item.x - centerX) * horizontalScale,
       y: item.y,
     })),
+    ...pupilTargets,
   ];
   render();
   ratioValue.textContent = Number(ratioControl.value).toFixed(2);

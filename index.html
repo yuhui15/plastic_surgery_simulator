@@ -88,7 +88,7 @@
               </div>
               <output id="ratioOutput">--</output>
             </div>
-            <p>长宽比 = 面部高度 ÷ 面部宽度；纵向基准保持不变，不叠加变形结果。</p>
+            <p>长宽比 = 面部高度 ÷ 面部宽度；瞳仁及其保护区域不会随面部长宽比变形。</p>
             <label class="ratio-label" for="ratioControl">长宽比 <output id="ratioValue">--</output></label>
             <input id="ratioControl" type="range" min="0.1" max="3" value="1" step="0.01" disabled />
           </div>
@@ -101,7 +101,7 @@
               </div>
               <output id="pupilRatioOutput">--</output>
             </div>
-            <p>瞳距面宽比 = 左右瞳仁中心距离 ÷ 面部宽度；调整时面部四点保持不动。</p>
+            <p>瞳距面宽比 = 左右瞳仁中心距离 ÷ 面部宽度；仅此指标会移动瞳仁区域。</p>
             <label class="ratio-label" for="pupilRatioControl">瞳距面宽比 <output id="pupilRatioValue">--</output></label>
             <input id="pupilRatioControl" type="range" min="0.1" max="1" value="0.5" step="0.01" disabled />
           </div>
