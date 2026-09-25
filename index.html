@@ -29,7 +29,13 @@
               <span class="toolbar-title">预览画布</span>
               <span id="canvasHint" class="toolbar-hint">上传图片后开始</span>
             </div>
-            <button id="clearPointButton" class="text-button" type="button" disabled>清除选点</button>
+            <div class="canvas-tools">
+              <label class="visibility-toggle">
+                <input id="pointVisibility" type="checkbox" checked />
+                <span>显示标记点</span>
+              </label>
+              <button id="clearPointButton" class="text-button" type="button" disabled>清除选点</button>
+            </div>
           </div>
           <div id="canvasStage" class="canvas-stage">
             <canvas id="faceCanvas" aria-label="面部照片编辑画布"></canvas>

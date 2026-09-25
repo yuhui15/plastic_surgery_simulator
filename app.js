@@ -17,6 +17,7 @@ const undoButton = document.querySelector("#undoButton");
 const resetButton = document.querySelector("#resetButton");
 const exportButton = document.querySelector("#exportButton");
 const clearPointButton = document.querySelector("#clearPointButton");
+const pointVisibility = document.querySelector("#pointVisibility");
 
 let originalImageData = null;
 let currentImageData = null;
@@ -25,6 +26,7 @@ let points = [];
 let originalPoints = [];
 let ratioSnapshotAdded = false;
 let pupilRatioSnapshotAdded = false;
+let showPoints = true;
 const pointNames = ["发际线", "下巴端点", "左颧骨", "右颧骨", "左瞳仁", "右瞳仁"];
 
 const cloneImageData = (data) => (
@@ -44,7 +46,7 @@ const updateButtons = () => {
 const render = () => {
   if (!currentImageData) return;
   ctx.putImageData(currentImageData, 0, 0);
-  if (points.length === 0) return;
+  if (points.length === 0 || !showPoints) return;
   const scale = canvas.width / canvas.getBoundingClientRect().width;
   ctx.save();
   ctx.strokeStyle = "#fff";
@@ -103,6 +105,7 @@ const applyTransforms = () => {
   const originalRatio = (bottom - top) / Math.max(1, right - left);
   const ratioScale = Number(ratioControl.value) / originalRatio;
   const horizontalScale = 1 / ratioScale;
+  const originalFaceWidth = Math.max(1, right - left);
   const result = cloneImageData(source);
   const feather = Math.max(28, Math.min(source.width, source.height) * 0.16);
   const smoothStep = (value) => {
@@ -119,6 +122,11 @@ const applyTransforms = () => {
 
   for (let y = 0; y < source.height; y += 1) {
     for (let x = 0; x < source.width; x += 1) {
+      const pupilProtectionRadius = Math.max(10, originalFaceWidth * 0.035);
+      const inPupilProtectionZone = pupilPoints.some((item) => (
+        Math.hypot(x - item.x, y - item.y) <= pupilProtectionRadius
+      ));
+      if (inPupilProtectionZone) continue;
       const influence = smoothStep(1 - outsideDistance(x, y) / feather);
       if (influence <= 0) continue;
       const targetX = centerX + (x - centerX) / horizontalScale;
@@ -132,7 +140,6 @@ const applyTransforms = () => {
     }
   }
   const originalPupilDistance = Math.abs(pupilPoints[1].x - pupilPoints[0].x);
-  const originalFaceWidth = Math.max(1, right - left);
   const pupilRatio = Number(pupilRatioControl.value);
   const pupilScale = (pupilRatio * originalFaceWidth) / Math.max(1, originalPupilDistance);
   const pupilCenter = (pupilPoints[0].x + pupilPoints[1].x) / 2;
@@ -146,6 +153,7 @@ const applyTransforms = () => {
     return value * value * (3 - 2 * value);
   };
   if (pupilPoints[0].x !== pupilPoints[1].x) {
+    const pupilSource = cloneImageData(result);
     for (let y = 0; y < source.height; y += 1) {
       for (let x = 0; x < source.width; x += 1) {
         const influence = pupilInfluence(x, y);
@@ -154,7 +162,7 @@ const applyTransforms = () => {
         const sampleX = x + (pupilX - x) * influence;
         const targetIndex = (y * source.width + x) * 4;
         for (let channel = 0; channel < 4; channel += 1) {
-          result.data[targetIndex + channel] = sampleBilinear(result, sampleX, y, channel);
+          result.data[targetIndex + channel] = sampleBilinear(pupilSource, sampleX, y, channel);
         }
       }
     }
@@ -181,7 +189,7 @@ const updatePointInstruction = () => {
   if (points.length < 6) {
     pointInstruction.textContent = `依次点击：${pointNames.join("、")}（${points.length}/6）。`;
     canvasHint.textContent = `请标记第 ${points.length + 1} 个点`;
-    pointStatus.innerHTML = `<span class="status-dot${points.length ? "" : " muted"}"></span>已标记 ${points.length}/4 个点${points.length ? ` · 下一个：${pointNames[points.length]}` : ""}`;
+    pointStatus.innerHTML = `<span class="status-dot${points.length ? "" : " muted"}"></span>已标记 ${points.length}/6 个点${points.length ? ` · 下一个：${pointNames[points.length]}` : ""}`;
   } else {
     pointInstruction.textContent = "六个点已确定，现在可以分别调整面部长宽比和瞳距面宽比。";
     canvasHint.textContent = "拖动下方滑杆改变面部比例";
@@ -224,6 +232,11 @@ ratioControl.addEventListener("input", () => {
   }
   applyTransforms();
   undoButton.disabled = false;
+});
+
+pointVisibility.addEventListener("change", () => {
+  showPoints = pointVisibility.checked;
+  render();
 });
 
 pupilRatioControl.addEventListener("input", () => {

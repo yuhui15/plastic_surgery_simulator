@@ -39,6 +39,9 @@ h1 em { color: var(--mint-deep); font-style: normal; }
 .toolbar-hint { margin-left: 10px; color: var(--muted); font-size: 12px; }
 .text-button { border: 0; padding: 0; color: var(--muted); background: transparent; font-size: 12px; }
 .text-button:disabled { opacity: .35; cursor: not-allowed; }
+.canvas-tools { display: flex; align-items: center; gap: 15px; }
+.visibility-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; user-select: none; }
+.visibility-toggle input { width: 13px; height: 13px; margin: 0; accent-color: var(--mint-deep); }
 .canvas-stage { position: relative; display: grid; min-height: 455px; place-items: center; overflow: hidden; background: #e9efee; }
 #faceCanvas { display: block; max-width: 100%; max-height: 620px; }
 .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: var(--muted); text-align: center; pointer-events: none; }
